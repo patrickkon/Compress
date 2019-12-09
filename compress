@@ -1,0 +1,181 @@
+#!/bin/bash
+# Author: Patrick Kon https://github.com/patrickkon
+# Function: Compress into common compressed file formats with 1 command
+# compress [options] [outputFilename] [input file/dir]
+ 
+
+# Initialize global variables:
+tool=""
+output=""
+input=""
+
+testInternetConnection()
+{
+    wget github.com >/dev/null 2>$1 || { echo "You do not have an internet \
+. Please try again!"; exit 1; }
+}
+
+isPackageHere()
+{   
+    if ! command -v $1 &>/dev/null; then
+        echo "You do not have the required package $1"
+        echo "Downloading it..."
+        sudo apt install $1
+    else 
+        echo "Using $1 to archive your file(s)."
+    fi
+}
+
+usage_instructions()
+{
+    cat << _EOF_
+Compress
+Description: Compress files/directories  into common compressed file formats
+Usage: compress [options] [output File] [input file/dir name]
+
+Compress Options:
+
+    -7z      7zip file format            Example:
+    -targz   Gzip file format            compress -7z outputfile /path/to/file
+    -bz2     Bzip2 file format
+    -zip     ZIP
+    -rar     rar
+
+Decompress Option:                                   Example:
+    -d       Decompress into original file format    compress -d /path/to/file
+
+Misc options:
+    -h       Show help
+    -v       Show tool version
+_EOF_
+}
+
+tooManyArgs()
+{
+    if (( $1 > 4 )); then
+        echo "Too many arguments. Only 1 input and 1 output file/directory allowed!"
+        exit 1
+    fi
+}
+
+runCompress()
+{
+    isPackageHere $tool
+    if [[ $tool == "rar" ]]; then
+        rar a -r $output $input
+    elif [[ $tool == "zip" ]]; then
+        zip -r $output $input
+    elif [[ $tool == "tar" ]]; then
+        if [[ $compression == "bzip2" ]]; then
+            tar pcjf $output $input
+        elif [[ $compression == "targz" ]]; then
+            tar pczf $output $input
+        fi
+    elif [[ $tool == "7zip" ]]; then
+        echo "7zip is not yet supported."
+        exit 0;
+    fi
+    return 0
+}
+
+# Note: currently only supports extracting to current working dir
+runDecompress()
+{
+    if [[ $(echo "$input" | tail -c 5) == *"gz" ]]; then
+        isPackageHere tar
+        tar xzf $input
+    elif [[ $(echo "$input" | tail -c 5) == *"bz" ]]; then
+        isPackageHere tar
+        tar xjf $input
+    elif [[ $(echo "$input" | tail -c 5) == *"zip" ]]; then
+        isPackageHere unzip
+        unzip $input
+    elif [[ $(echo "$input" | tail -c 5) == *"rar" ]]; then
+        isPackageHere unrar
+        unrar e $input
+    else 
+        echo "Your file format is not supported."
+        exit 1
+    fi
+}
+
+# Main program entry point:
+if [[ $# == "0" ]]; then
+   usage_instructions
+   exit 1
+fi 
+
+while [ "$1" != "" ]; do
+    case $1 in
+
+        -rar )
+            tooManyArgs $# 
+            tool="rar"
+            shift 
+            output=$1
+            shift
+            input=$1
+            runCompress
+            ;;
+        -zip )
+            tooManyArgs $# 
+            tool="zip"
+            shift
+            output=$1
+            shift
+            input=$1
+            runCompress
+            ;;
+#        -7z )
+#            tooManyArgs $# 
+#            tool="7zip"
+#            shift
+#            output=$1
+#            shift
+#            input=$1
+#            runCompress
+#            ;;
+        -bz2 )
+            tooManyArgs $# 
+            tool="tar"
+            compression="bzip2"
+            shift
+            output=$1
+            shift
+            input=$1
+            runCompress
+            ;;
+        -targz )
+            tooManyArgs $# 
+            tool="tar"
+            compression="targz"
+            shift
+            output=$1
+            shift
+            input=$1
+            runCompress
+            ;;
+
+            -d )
+            tooManyArgs $# 
+            shift
+            input=$1                     
+            runDecompress
+            ;;
+            -h )
+            usage_instructions
+            exit 0
+            ;;
+            -v )
+            echo "Option not yet implemented"
+            exit 0
+            ;;
+             * ) 
+            usage_instructions
+            exit 1
+            ;;
+     esac 
+     shift
+done
+
+exit 0
